@@ -4,5 +4,7 @@
 <dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
+	<key>BASE_URL</key>
+	<string>https://jsonplaceholder.typicode.com</string>
 </dict>
 </plist>
