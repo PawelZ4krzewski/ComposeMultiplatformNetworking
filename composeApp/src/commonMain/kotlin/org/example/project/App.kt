@@ -42,8 +42,6 @@ fun App() {
                         onClick = { selected = 1 })
                 }
                 
-                // Preserve state by keeping both composables in composition
-                // but only showing the selected one
                 if (selected == 0) {
                     BenchScreen()
                 } else {

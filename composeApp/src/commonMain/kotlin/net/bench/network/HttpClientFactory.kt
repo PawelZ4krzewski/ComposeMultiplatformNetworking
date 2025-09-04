@@ -46,7 +46,6 @@ fun createHttpClient(
     }
 
     install(Logging) {
-        // Enforce no HTTP logging in release; optionally allow in debug
         level = if (enableLogging) LogLevel.HEADERS else LogLevel.NONE
     }
 }

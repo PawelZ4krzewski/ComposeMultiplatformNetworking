@@ -93,8 +93,6 @@ android {
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 1
         versionName = "1.0"
-    // Deterministic config with Gradle -P overrides (defaults per requirements)
-    // Keep Android's BuildConfig fields (useful in platform actuals and debugging)
     val aBaseUrl = (project.findProperty("BASE_URL") as String?) ?: "https://jsonplaceholder.typicode.com"
     val aConnectMs = (project.findProperty("CONNECT_TIMEOUT_MS") as String?) ?: "8000"
     val aSendMs = (project.findProperty("SEND_TIMEOUT_MS") as String?) ?: "8000"

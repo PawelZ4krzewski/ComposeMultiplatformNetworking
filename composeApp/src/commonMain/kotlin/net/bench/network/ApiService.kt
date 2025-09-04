@@ -138,7 +138,7 @@ class ApiService(private val client: HttpClient, private val enableRetry: Boolea
         val el = runCatching { Json.parseToJsonElement(text) }.getOrNull() ?: return emptyList()
         val array: JsonArray = when (el) {
             is JsonArray -> el
-            is JsonObject -> JsonArray(listOf(el)) // Single object -> single item list
+            is JsonObject -> JsonArray(listOf(el))
             else -> return emptyList()
         }
         
