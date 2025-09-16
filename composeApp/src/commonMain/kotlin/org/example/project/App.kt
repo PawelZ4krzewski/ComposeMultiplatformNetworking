@@ -22,7 +22,7 @@ import net.bench.ui.DataScreen
 fun App() {
     MaterialTheme {
         Scaffold(
-            modifier = Modifier.padding(top = 16.dp)
+            modifier = Modifier
         ) { padding ->
             var selected by remember { mutableIntStateOf(0) }
             

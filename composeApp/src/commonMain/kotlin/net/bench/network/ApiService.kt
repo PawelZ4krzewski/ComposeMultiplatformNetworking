@@ -45,7 +45,7 @@ class ApiService(private val client: HttpClient, private val enableRetry: Boolea
             } catch (t: Throwable) {
                 val ms = mark.elapsedNow().inWholeMilliseconds
                 logDebug("NET_GET_MS: $ms")
-                val err = mapError(t)
+                val err = mapError(t).copy(durationMs = ms)
                 lastError = err
                 if (attempt < maxAttempts) {
                     delay(500)
@@ -64,12 +64,12 @@ class ApiService(private val client: HttpClient, private val enableRetry: Boolea
                     status in 500..599 -> ApiResult.NetworkError.Kind.Http5xx
                     else -> ApiResult.NetworkError.Kind.Unknown
                 }
-                val err = ApiResult.NetworkError(kind, status, payloadText)
+        val err = ApiResult.NetworkError(kind, status, payloadText, ms)
                 lastError = err
                 if (attempt < maxAttempts) delay(500) else break
             }
         }
-        return@withContext lastError ?: ApiResult.NetworkError(ApiResult.NetworkError.Kind.Unknown, null, "No result")
+    return@withContext lastError ?: ApiResult.NetworkError(ApiResult.NetworkError.Kind.Unknown, null, "No result", 0)
     }
 
     suspend fun fetchList(path: String): ApiResult<List<SampleDto>> = withContext(Dispatchers.Default) {
@@ -93,7 +93,7 @@ class ApiService(private val client: HttpClient, private val enableRetry: Boolea
             } catch (t: Throwable) {
                 val ms = mark.elapsedNow().inWholeMilliseconds
                 logDebug("NET_GET_MS: $ms")
-                val err = mapError(t)
+                val err = mapError(t).copy(durationMs = ms)
                 lastError = err
                 if (attempt < maxAttempts) {
                     delay(500)
@@ -112,12 +112,12 @@ class ApiService(private val client: HttpClient, private val enableRetry: Boolea
                     status in 500..599 -> ApiResult.NetworkError.Kind.Http5xx
                     else -> ApiResult.NetworkError.Kind.Unknown
                 }
-                val err = ApiResult.NetworkError(kind, status, payloadText)
+        val err = ApiResult.NetworkError(kind, status, payloadText, ms)
                 lastError = err
                 if (attempt < maxAttempts) delay(500) else break
             }
         }
-        return@withContext lastError ?: ApiResult.NetworkError(ApiResult.NetworkError.Kind.Unknown, null, "No result")
+    return@withContext lastError ?: ApiResult.NetworkError(ApiResult.NetworkError.Kind.Unknown, null, "No result", 0)
     }
 
     private fun decodeSample(text: String): SampleDto? {
@@ -152,10 +152,10 @@ class ApiService(private val client: HttpClient, private val enableRetry: Boolea
     }
 
     private fun mapError(t: Throwable): ApiResult.NetworkError = when (t) {
-        is CancellationException -> ApiResult.NetworkError(ApiResult.NetworkError.Kind.Cancel, null, t.message)
-        is HttpRequestTimeoutException -> ApiResult.NetworkError(ApiResult.NetworkError.Kind.Timeout, null, t.message)
-    is IOException -> ApiResult.NetworkError(ApiResult.NetworkError.Kind.NoInternet, null, t.message)
-        is SerializationException -> ApiResult.NetworkError(ApiResult.NetworkError.Kind.Unknown, null, t.message)
-        else -> ApiResult.NetworkError(ApiResult.NetworkError.Kind.Unknown, null, t.message)
+        is CancellationException -> ApiResult.NetworkError(ApiResult.NetworkError.Kind.Cancel, null, t.message, 0)
+        is HttpRequestTimeoutException -> ApiResult.NetworkError(ApiResult.NetworkError.Kind.Timeout, null, t.message, 0)
+        is IOException -> ApiResult.NetworkError(ApiResult.NetworkError.Kind.NoInternet, null, t.message, 0)
+        is SerializationException -> ApiResult.NetworkError(ApiResult.NetworkError.Kind.Unknown, null, t.message, 0)
+        else -> ApiResult.NetworkError(ApiResult.NetworkError.Kind.Unknown, null, t.message, 0)
     }
 }

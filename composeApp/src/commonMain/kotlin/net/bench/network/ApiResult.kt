@@ -5,7 +5,8 @@ sealed class ApiResult<out T> {
     data class NetworkError(
         val kind: Kind,
         val statusCode: Int? = null,
-        val message: String? = null
+        val message: String? = null,
+        val durationMs: Long
     ) : ApiResult<Nothing>() {
         enum class Kind { Timeout, NoInternet, Http4xx, Http5xx, Cancel, Unknown }
     }

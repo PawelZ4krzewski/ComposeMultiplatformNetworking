@@ -19,7 +19,7 @@ data class BenchEntry(val ms: Long, val status: Int?, val kind: ApiResult.Networ
 data class BenchState(
     val baseUrl: String = ApiConfig.baseUrl,
     val path: String = "/todos/1",
-    val runs: Int = 20,
+    val runs: Int = 30,
     val warmup: Boolean = true,
     val connectMs: Long = ApiConfig.connectTimeoutMs,
     val sendMs: Long = ApiConfig.sendTimeoutMs,
@@ -72,25 +72,95 @@ class BenchViewModel {
 
         scope.launch {
             try {
-                _state.update { it.copy(running = true, results = emptyList(), lastPayloadPreview = "", aggregates = Aggregates()) }
+                _state.update {
+                    it.copy(
+                        running = true,
+                        results = emptyList(),
+                        lastPayloadPreview = "",
+                        aggregates = Aggregates()
+                    )
+                }
                 val all = mutableListOf<BenchEntry>()
                 val runs = s.runs
                 repeat(runs) { idx ->
                     when (val res = service.fetch(s.path)) {
                         is ApiResult.Success -> {
-                            if (!(s.warmup && idx == 0)) all += BenchEntry(res.durationMs, res.statusCode, null)
-                            _state.update { st -> st.copy(lastPayloadPreview = res.data.toString().take(200)) }
+                            if (!(s.warmup && idx == 0)) all += BenchEntry(
+                                res.durationMs,
+                                res.statusCode,
+                                null
+                            )
+                            _state.update { st ->
+                                st.copy(
+                                    lastPayloadPreview = res.data.toString().take(200)
+                                )
+                            }
+                            println("BENCH_ATTEMPT idx=$idx status=${res.statusCode} ms=${res.durationMs} kind=OK")
                         }
+
                         is ApiResult.NetworkError -> {
-                            if (!(s.warmup && idx == 0)) all += BenchEntry(0, res.statusCode, res.kind)
+                            if (!(s.warmup && idx == 0)) all += BenchEntry(
+                                res.durationMs,
+                                res.statusCode,
+                                res.kind
+                            )
+                            println("BENCH_ATTEMPT idx=$idx status=${res.statusCode} ms=${res.durationMs} kind=${res.kind}")
                         }
                     }
                 }
-                _state.update { it.copy(running = false, results = all.toList(), aggregates = computeAggregates(all)) }
+                val aggs = computeAggregates(all)
+                _state.update {
+                    it.copy(
+                        running = false,
+                        results = all.toList(),
+                        aggregates = aggs
+                    )
+                }
+                println("BENCH_SUMMARY count=${aggs.count} median=${aggs.median} p95=${aggs.p95} min=${aggs.min} max=${aggs.max} timeout=${aggs.timeout} noNet=${aggs.noInternet} http4xx=${aggs.http4xx} http5xx=${aggs.http5xx} cancel=${aggs.cancel} unknown=${aggs.unknown}")
             } finally {
                 client.close()
             }
         }
+    }
+
+    fun runPreset(presetBase: net.bench.bench.ScenarioPreset, runs: Int, warmup: Boolean) {
+        val preset = presetBase
+        _state.update {
+            it.copy(
+                baseUrl = preset.baseUrl,
+                path = preset.path,
+                runs = runs,
+                warmup = warmup,
+                connectMs = preset.connectTimeoutMs.toLong(),
+                sendMs = preset.sendTimeoutMs.toLong(),
+                receiveMs = preset.receiveTimeoutMs.toLong(),
+                enableRetry = preset.enableRetry
+            )
+        }
+        runBench()
+    }
+
+    fun buildCsv(scenario: net.bench.bench.ScenarioPreset?): String {
+        val st = _state.value
+        val header = "index,status,errorKind,durationMs";
+        val rows = st.results.mapIndexed { i, r -> "$i,${r.status ?: "-"},${r.kind ?: ""},${r.ms}" }
+        val agg = st.aggregates
+        val meta =
+            "# tool=compose-kmp platform=? baseUrl=${st.baseUrl} path=${st.path} runs=${st.runs} warmup=${st.warmup} timeouts=${st.connectMs}/${st.sendMs}/${st.receiveMs} retry=${st.enableRetry} ua=NetBench/1.0"
+        val summary =
+            "# aggregates count=${agg.count} median=${agg.median} p95=${agg.p95} min=${agg.min} max=${agg.max} timeouts=${agg.timeout} noInternet=${agg.noInternet} http4xx=${agg.http4xx} http5xx=${agg.http5xx} cancel=${agg.cancel} unknown=${agg.unknown} scenario=${scenario?.id}";
+        return (listOf(meta, header) + rows + summary).joinToString("\n")
+    }
+
+    fun buildMarkdown(scenario: net.bench.bench.ScenarioPreset?): String {
+        val st = _state.value
+        val a = st.aggregates
+        val meta =
+            "|tool|platform|scenario|baseUrl|path|runs|warmup|median|p95|min|max|timeouts|noNet|4xx|5xx|cancel|unknown|";
+        val sep = "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|";
+        val row =
+            "|compose-kmp|?|${scenario?.id}|${st.baseUrl}|${st.path}|${st.runs}|${st.warmup}|${a.median}|${a.p95}|${a.min}|${a.max}|${a.timeout}|${a.noInternet}|${a.http4xx}|${a.http5xx}|${a.cancel}|${a.unknown}|";
+        return listOf(meta, sep, row).joinToString("\n")
     }
 
     private fun computeAggregates(list: List<BenchEntry>): Aggregates {
@@ -104,7 +174,8 @@ class BenchViewModel {
             val b = times[times.size / 2]
             (a + b) / 2
         }
-        val p95Index = if (times.isEmpty()) 0 else floor(0.95 * (times.size - 1)).toInt().coerceIn(0, times.lastIndex)
+        val p95Index = if (times.isEmpty()) 0 else floor(0.95 * (times.size - 1)).toInt()
+            .coerceIn(0, times.lastIndex)
         val p95 = if (times.isEmpty()) 0 else times[p95Index]
         val min = times.firstOrNull() ?: 0
         val max = times.lastOrNull() ?: 0
